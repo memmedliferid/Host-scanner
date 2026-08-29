@@ -83,7 +83,7 @@ if __name__ == "__main__":
 
     msg = "\n".join(report_lines)
     if len(msg) > 4000:
-        msg = msg[:3900] + "\n...(çoxluq səbəbindən kəsildi)"
+        msg = msg[:3900] + "\n...(çoxluq səbəbə görə kəsildi)"
         
     send_telegram(msg)
     print("[*] Hesabat Telegram-a göndərildi.")
