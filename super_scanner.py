@@ -4,7 +4,7 @@ import urllib3
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-TELEGRAM_TOKEN = "BURAYA_YENI_BOT_TOKEN"
+TELEGRAM_TOKEN = "8811650010:AAFGCoQ5rMLmu4AjgjxxGeaNQ60WaTVpXeY"
 CHAT_ID = "1436101177"
 
 DOMAINS = ["nar.az", "azercell.com"]
