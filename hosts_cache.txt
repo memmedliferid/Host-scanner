@@ -1,7 +1,6 @@
 app.nar.az
 b2b-api.azercell.com
 bax.nar.az
-bilet.nar.az
 biznes.azercell.com
 busuu.azercell.com
 careers.azercell.com
@@ -24,13 +23,11 @@ kabinetim.azercell.com
 kc.azercell.com
 kids.azercell.com
 lh-prod.azercell.com
-link.nar.az
 lotereya.nar.az
 loyaltygateway.azercell.com
 lyncdiscover.azercell.com
 mailgw-a.azercell.com
 mailgw.azercell.com
-nar.az
 nextcloud.azercell.com
 ns.azercell.com
 ns1.azercell.com
@@ -50,13 +47,9 @@ suretiartir.nar.az
 survey-new.azercell.com
 survey.azercell.com
 test.nar.az
-topla.nar.az
 w.nar.az
 webchat.azercell.com
 wic.azercell.com
 wmail.azercell.com
 www.azercell.com
 www.nar.az
-www.suretiartir.nar.az
-yenile.nar.az
-yeniliklerdalgasi.nar.az
