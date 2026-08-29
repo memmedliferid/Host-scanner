@@ -5,7 +5,7 @@ import urllib3
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-TELEGRAM_TOKEN = "8811650010:AAFxs4epnYNb14LG1WaeZS36j957ho3VGuE"
+TELEGRAM_TOKEN = "8811650010:AAGhcoiPaF97VA5pXMhhNnhISok1fZNZ-J0"
 CHAT_ID = "1436101177"
 DOMAINS = ["nar.az", "azercell.com"]
 
@@ -83,7 +83,7 @@ if __name__ == "__main__":
 
     msg = "\n".join(report_lines)
     if len(msg) > 4000:
-        msg = msg[:3900] + "\n...(çoxluq səbəbə görə kəsildi)"
+        msg = msg[:3900] + "\n...(çoxluq səbəbilə kəsildi)"
         
     send_telegram(msg)
     print("[*] Hesabat Telegram-a göndərildi.")
