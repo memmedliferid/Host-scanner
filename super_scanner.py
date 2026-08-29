@@ -5,7 +5,7 @@ import urllib3
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-TELEGRAM_TOKEN = "8633891826:AAGwlt8LIOK0aiByAyQDmw23q21bsmeAm28"
+TELEGRAM_TOKEN = "8811650010:AAFxs4epnYNb14LG1WaeZS36j957ho3VGuE"
 CHAT_ID = "1436101177"
 DOMAINS = ["nar.az", "azercell.com"]
 
