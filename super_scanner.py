@@ -3,7 +3,7 @@ import os
 from datetime import datetime, timezone
 
 # TOKENI BURADA YAZ
-TELEGRAM_TOKEN = "BURA_TOKENI_YAZ"
+TELEGRAM_TOKEN = "8811650010:AAF3qAKekoObZInM2NQavrc4YfnakHUBF7A"
 
 CHAT_ID = "1436101177"
 
