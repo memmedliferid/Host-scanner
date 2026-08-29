@@ -2,9 +2,12 @@ import requests
 import os
 from datetime import datetime, timezone
 
-TELEGRAM_TOKEN = "8811650010:AAF3qAKekoObZInM2NQavrc4YfnakHUBF7A"
+# TOKENI BURADA YAZ
+TELEGRAM_TOKEN = "BURA_TOKENI_YAZ"
+
 CHAT_ID = "1436101177"
 
+# Yalnız icazəli olduğun domenlər
 DOMAINS = [
     "nar.az",
     "azercell.com"
@@ -17,28 +20,37 @@ HEADERS = {
 }
 
 
-def send_telegram(text):
+def send_telegram(message):
+    if not TELEGRAM_TOKEN or TELEGRAM_TOKEN == "8811650010:AAF3qAKekoObZInM2NQavrc4YfnakHUBF7A":
+        print("Telegram token yazılmayıb!")
+        return False
+
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
 
     try:
-        r = requests.post(
+        response = requests.post(
             url,
             data={
                 "chat_id": CHAT_ID,
-                "text": text
+                "text": message
             },
             timeout=20
         )
 
-        print("Telegram:", r.status_code, r.text[:300])
-        return r.ok
+        print("Telegram:", response.status_code)
+
+        if response.ok:
+            return True
+
+        print(response.text)
+        return False
 
     except Exception as e:
         print("Telegram xətası:", e)
         return False
 
 
-def normalize(host, domain):
+def normalize_host(host, domain):
     host = host.strip().lower().rstrip(".")
 
     if host.startswith("*."):
@@ -50,48 +62,66 @@ def normalize(host, domain):
     return None
 
 
-def crtsh(domain):
-    result = set()
+def get_crtsh(domain):
+    results = set()
 
     try:
         url = f"https://crt.sh/?q=%25.{domain}&output=json"
-        r = requests.get(url, headers=HEADERS, timeout=30)
 
-        if r.status_code == 200:
-            for item in r.json():
-                for name in item.get("name_value", "").splitlines():
-                    host = normalize(name, domain)
+        response = requests.get(
+            url,
+            headers=HEADERS,
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            for item in response.json():
+                names = item.get("name_value", "")
+
+                for name in names.splitlines():
+                    host = normalize_host(name, domain)
+
                     if host:
-                        result.add(host)
+                        results.add(host)
 
     except Exception as e:
         print("crt.sh:", e)
 
-    return result
+    return results
 
 
-def hackertarget(domain):
-    result = set()
+def get_hackertarget(domain):
+    results = set()
 
     try:
         url = f"https://api.hackertarget.com/hostsearch/?q={domain}"
-        r = requests.get(url, headers=HEADERS, timeout=30)
 
-        if r.status_code == 200:
-            for line in r.text.splitlines():
-                if "," in line:
-                    host = normalize(line.split(",", 1)[0], domain)
-                    if host:
-                        result.add(host)
+        response = requests.get(
+            url,
+            headers=HEADERS,
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            for line in response.text.splitlines():
+
+                if "," not in line:
+                    continue
+
+                host = line.split(",", 1)[0]
+                host = normalize_host(host, domain)
+
+                if host:
+                    results.add(host)
 
     except Exception as e:
         print("HackerTarget:", e)
 
-    return result
+    return results
 
 
-def alienvault(domain):
-    result = set()
+def get_alienvault(domain):
+    results = set()
 
     try:
         url = (
@@ -99,156 +129,184 @@ def alienvault(domain):
             f"api/v1/indicators/domain/{domain}/passive_dns"
         )
 
-        r = requests.get(url, headers=HEADERS, timeout=30)
+        response = requests.get(
+            url,
+            headers=HEADERS,
+            timeout=30
+        )
 
-        if r.status_code == 200:
-            for item in r.json().get("passive_dns", []):
-                host = normalize(
-                    item.get("hostname", ""),
-                    domain
-                )
+        if response.status_code == 200:
+            data = response.json()
+
+            for item in data.get("passive_dns", []):
+                host = item.get("hostname", "")
+                host = normalize_host(host, domain)
 
                 if host:
-                    result.add(host)
+                    results.add(host)
 
     except Exception as e:
         print("AlienVault:", e)
 
-    return result
+    return results
 
 
-def anubis(domain):
-    result = set()
+def get_anubis(domain):
+    results = set()
 
     try:
         url = f"https://jldc.me/anubis/subdomains/{domain}"
-        r = requests.get(url, headers=HEADERS, timeout=30)
 
-        if r.status_code == 200:
-            for name in r.json():
-                host = normalize(name, domain)
+        response = requests.get(
+            url,
+            headers=HEADERS,
+            timeout=30
+        )
 
-                if host:
-                    result.add(host)
+        if response.status_code == 200:
+            data = response.json()
+
+            if isinstance(data, list):
+                for name in data:
+                    host = normalize_host(name, domain)
+
+                    if host:
+                        results.add(host)
 
     except Exception as e:
         print("Anubis:", e)
 
-    return result
+    return results
 
 
 def load_cache():
     if not os.path.exists(CACHE_FILE):
         return set()
 
-    with open(CACHE_FILE, "r", encoding="utf-8") as f:
-        return {
-            line.strip()
-            for line in f
-            if line.strip()
-        }
+    try:
+        with open(CACHE_FILE, "r", encoding="utf-8") as file:
+            return {
+                line.strip().lower()
+                for line in file
+                if line.strip()
+            }
+
+    except Exception as e:
+        print("Cache oxuma xətası:", e)
+        return set()
 
 
 def save_cache(hosts):
-    with open(CACHE_FILE, "w", encoding="utf-8") as f:
+    with open(CACHE_FILE, "w", encoding="utf-8") as file:
         for host in sorted(hosts):
-            f.write(host + "\n")
+            file.write(host + "\n")
 
 
-def scan():
-    all_hosts = set()
+def scan_domain(domain):
+    results = set()
 
-    for domain in DOMAINS:
-        print(f"\n[+] {domain}")
+    print(f"\n[+] {domain} yoxlanılır...")
 
-        all_hosts.update(crtsh(domain))
-        all_hosts.update(hackertarget(domain))
-        all_hosts.update(alienvault(domain))
-        all_hosts.update(anubis(domain))
+    results.update(get_crtsh(domain))
+    results.update(get_hackertarget(domain))
+    results.update(get_alienvault(domain))
+    results.update(get_anubis(domain))
 
-    return all_hosts
+    print(
+        f"[+] {domain}: "
+        f"{len(results)} subdomain tapıldı"
+    )
+
+    return results
+
+
+def send_report(hosts, title):
+    if not hosts:
+        return
+
+    lines = [
+        title,
+        "",
+        f"Say: {len(hosts)}",
+        ""
+    ]
+
+    for host in sorted(hosts):
+        lines.append(f"• {host}")
+
+    message = "\n".join(lines)
+
+    # Telegram mesajlarını hissələrə böl
+    while message:
+
+        if len(message) <= 3800:
+            part = message
+            message = ""
+        else:
+            cut = message.rfind("\n", 0, 3800)
+
+            if cut <= 0:
+                cut = 3800
+
+            part = message[:cut]
+            message = message[cut:].lstrip()
+
+        send_telegram(part)
 
 
 def main():
 
-    print("[+] Scanner başladı")
+    print("=" * 50)
+    print("PASSİV SUBDOMAIN SCANNER")
+    print("=" * 50)
 
-    # Telegram bağlantısını yoxla
-    if not TELEGRAM_TOKEN or TELEGRAM_TOKEN == "BURA_TOKENI_YAZ":
-        print("Token yazılmayıb.")
+    if TELEGRAM_TOKEN == "BURA_TOKENI_YAZ":
+        print("Əvvəl Telegram tokenini yaz!")
         return
 
-    current = scan()
-    old = load_cache()
+    current_hosts = set()
 
-    new = current - old
+    for domain in DOMAINS:
+        current_hosts.update(scan_domain(domain))
+
+    old_hosts = load_cache()
+
+    new_hosts = current_hosts - old_hosts
+
+    print()
+    print(f"Ümumi subdomain: {len(current_hosts)}")
+    print(f"Əvvəlki: {len(old_hosts)}")
+    print(f"Yeni: {len(new_hosts)}")
 
     now = datetime.now(timezone.utc).strftime(
         "%Y-%m-%d %H:%M UTC"
     )
 
-    print("Ümumi:", len(current))
-    print("Yeni:", len(new))
+    if not old_hosts:
 
-    # İlk dəfə işləyirsə, bütün mövcud nəticələri göndər
-    if not old:
-        report = [
-            "🔎 SUBDOMAIN SCAN",
-            f"Vaxt: {now}",
-            "",
-            f"Tapılan subdomain: {len(current)}",
-            ""
-        ]
-
-        report.extend(
-            f"• {host}"
-            for host in sorted(current)
+        send_report(
+            current_hosts,
+            f"🔎 İLK SUBDOMAIN HESABATI\n{now}"
         )
 
-    elif new:
-        report = [
-            "🆕 YENİ SUBDOMAINLƏR",
-            f"Vaxt: {now}",
-            "",
-            f"Yeni: {len(new)}",
-            f"Ümumi: {len(current)}",
-            ""
-        ]
+    elif new_hosts:
 
-        report.extend(
-            f"• {host}"
-            for host in sorted(new)
+        send_report(
+            new_hosts,
+            f"🆕 YENİ SUBDOMAINLƏR\n{now}"
         )
 
     else:
-        report = [
-            "✅ SCAN TAMAMLANDI",
-            f"Vaxt: {now}",
-            "",
-            "Yeni subdomain tapılmadı.",
-            f"Ümumi məlum subdomain: {len(current)}"
-        ]
 
-    message = "\n".join(report)
+        send_telegram(
+            "✅ SCAN TAMAMLANDI\n"
+            f"{now}\n\n"
+            "Yeni subdomain tapılmadı."
+        )
 
-    # Telegram mesajlarını hissələrə böl
-    while message:
+    save_cache(current_hosts)
 
-        part = message[:3800]
-
-        if len(message) > 3800:
-            cut = part.rfind("\n")
-
-            if cut > 0:
-                part = message[:cut]
-
-        send_telegram(part)
-
-        message = message[len(part):].lstrip()
-
-    save_cache(current)
-
-    print("[+] Bitdi")
+    print("\n[+] Scanner tamamlandı.")
 
 
 if __name__ == "__main__":
