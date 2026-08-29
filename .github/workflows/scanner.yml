@@ -1,0 +1,33 @@
+name: Host Scanner Bot
+
+on:
+  schedule:
+    - cron: '*/30 * * * *' # Hər 30 dəqiqədən bir avtomatik işləyəcək
+  workflow_dispatch: # Əllə istədiyin vaxt yoxlamaq üçün düymə
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Repository-ni yüklə
+        uses: actions/checkout@v3
+
+      - name: Python quraşdır
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Kitabxanaları yüklə
+        run: pip install requests
+
+      - name: Skripti işə sal
+        run: python super_scanner.py
+
+      - name: Yenilikləri yadda saxla
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "Yeni hostlar avtomatik olaraq yeniləndi"
+          file_pattern: super_known_hosts.txt
+          
