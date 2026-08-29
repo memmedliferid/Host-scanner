@@ -1,12 +1,11 @@
 import requests
 import socket
 import os
-import time
 import urllib3
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-#
+# 
 TELEGRAM_TOKEN = "8811650010:AAFGCoQ5rMLmu4AjgjxxGeaNQ60WaTVpXeY"
 CHAT_ID = "1436101177"
 
@@ -110,8 +109,8 @@ def save_cache(hosts):
         for h in sorted(hosts):
             f.write(h + "\n")
 
-def run_scanner():
-    print(f"\n[🔥] Skan başladı: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+if __name__ == "__main__":
+    print("[🔥] Host Scanner işə düşdü...")
     current_hosts = set()
     
     for dom in DOMAINS:
@@ -122,22 +121,23 @@ def run_scanner():
 
     old_hosts = load_cache()
     is_first_run = len(old_hosts) == 0
-    
-    # Əgər ilk dəfədirsə hamısını, deyilsə yalnız yeni hostları götürürük
-    target_hosts = current_hosts if is_first_run else (current_hosts - old_hosts)
+    new_hosts = current_hosts - old_hosts if not is_first_run else current_hosts
 
-    if target_hosts:
+    # Əgər yeni host tapılıbsa və ya ilk run-dursa hesabatı göndər
+    if new_hosts or is_first_run:
+        target_list = new_hosts if not is_first_run else current_hosts
         host_results = {}
-        for host in sorted(target_hosts):
+        for host in sorted(target_list):
             status = check_host_status(host)
             if status:
                 host_results[host] = status
 
         if host_results:
+            title = "Nar və Azercell Yeni Host Hesabatı" if not is_first_run else "Nar və Azercell İlk Host Hesabatı"
             report_lines = [
-                "Nar və Azercell Yeni Host Hesabatı",
+                title,
                 f"Ümumi tapılan: {len(current_hosts)}",
-                f"Yeni tapılan aktiv host sayı: {len(host_results)}",
+                f"Aktiv host sayı: {len(host_results)}",
                 ""
             ]
             
@@ -149,21 +149,8 @@ def run_scanner():
                 msg = msg[:3900] + "\n...(çoxluq səbəbilə kəsildi)"
                 
             send_telegram(msg)
-        else:
-            print("Yeni hostlar tapıldı, lakin heç biri aktiv/açıq deyil.")
     else:
         print("Yeni host tapılmadı.")
 
     save_cache(current_hosts)
-
-if __name__ == "__main__":
-    print("[🚀] Host Monitor Bot avtomatik rejimdə işə düşdü (hər 24 saatdan bir yoxlayacaq)...")
-    while True:
-        try:
-            run_scanner()
-        except Exception as e:
-            print(f"Xəta baş verdi: {e}")
-        
-        print("[⏳] Növbəti yoxlamaya 24 saat qaldı...")
-        time.sleep(86400)  # 86400 saniyə = 24 saat
-        
+    
