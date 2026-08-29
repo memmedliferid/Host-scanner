@@ -1,36 +1,44 @@
-name: Host Scanner Bot
+name: Subdomain Scanner
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: '0 8 */2 * *'  # Hər 2 gündən bir avtomatik yoxlayır
+    - cron: "17 2 */2 * *"
+
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  run-scanner:
+  scanner:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Repository-ni yüklə
+
+      - name: Repository
         uses: actions/checkout@v4
 
-      - name: Python quraşdır
+      - name: Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.x"
 
-      - name: Kitabxanaları yüklə
-        run: pip install requests
-
-      - name: Skripti işə sal
-        run: python super_scanner.py
-
-      - name: Bazanı yenilə və yadda saxla
+      - name: Requests
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          pip install requests
+
+      - name: Scanner
+        run: |
+          python scanner.py
+
+      - name: Cache yadda saxla
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add hosts_cache.txt
-          git diff --staged --quiet || git commit -m "Update hosts cache [skip ci]"
+
+          git diff --cached --quiet || \
+          git commit -m "Update subdomain cache"
+
           git push
-          
