@@ -1,12 +1,11 @@
 import requests
 import socket
-import os
 import urllib3
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
-CHAT_ID = os.environ["CHAT_ID"]
+TELEGRAM_TOKEN = "BURAYA_YENI_BOT_TOKEN"
+CHAT_ID = "1436101177"
 
 DOMAINS = ["nar.az", "azercell.com"]
 
@@ -33,18 +32,14 @@ def send_telegram(message):
 
 def get_crtsh_subdomains(domain):
     subdomains = set()
-    url = f"https://crt.sh/?q=%25.{domain}&output=json"
 
     try:
+        url = f"https://crt.sh/?q=%25.{domain}&output=json"
         response = requests.get(url, timeout=20)
 
         if response.status_code == 200:
-            data = response.json()
-
-            for entry in data:
-                name_value = entry.get("name_value", "")
-
-                for sub in name_value.split("\n"):
+            for entry in response.json():
+                for sub in entry.get("name_value", "").split("\n"):
                     sub = sub.strip().lower()
 
                     if sub.endswith(domain) and "*" not in sub:
@@ -53,40 +48,32 @@ def get_crtsh_subdomains(domain):
             print(f"crt.sh HTTP xətası: {response.status_code}")
 
     except Exception as e:
-        print(f"crt.sh xətası ({domain}): {e}")
+        print(f"crt.sh xətası: {e}")
 
     return subdomains
 
 
 def get_hackertarget_subdomains(domain):
     subdomains = set()
-    url = f"https://api.hackertarget.com/hostsearch/?q={domain}"
 
     try:
+        url = f"https://api.hackertarget.com/hostsearch/?q={domain}"
         response = requests.get(url, timeout=15)
 
         if response.status_code == 200:
-            if "API count exceeded" not in response.text:
+            for line in response.text.splitlines():
 
-                for line in response.text.splitlines():
+                if "," in line:
+                    sub = line.split(",")[0].strip().lower()
 
-                    if "," in line:
-                        sub = line.split(",")[0].strip().lower()
-
-                        if sub.endswith(domain):
-                            subdomains.add(sub)
-
-            else:
-                print(f"HackerTarget API limiti dolub: {domain}")
+                    if sub.endswith(domain):
+                        subdomains.add(sub)
 
         else:
-            print(
-                f"HackerTarget HTTP xətası "
-                f"({domain}): {response.status_code}"
-            )
+            print(f"HackerTarget HTTP xətası: {response.status_code}")
 
     except Exception as e:
-        print(f"HackerTarget xətası ({domain}): {e}")
+        print(f"HackerTarget xətası: {e}")
 
     return subdomains
 
@@ -122,7 +109,7 @@ if __name__ == "__main__":
 
     for domain in DOMAINS:
 
-        print(f"[*] {domain} üçün subdomainlər axtarılır...")
+        print(f"[*] {domain} axtarılır...")
 
         current_hosts.update(
             get_crtsh_subdomains(domain)
@@ -132,10 +119,7 @@ if __name__ == "__main__":
             get_hackertarget_subdomains(domain)
         )
 
-    print(
-        f"[*] Ümumi tapılan host sayı: "
-        f"{len(current_hosts)}"
-    )
+    print(f"[*] Tapılan host sayı: {len(current_hosts)}")
 
     report_lines = [
         "Nar və Azercell Host Hesabatı",
@@ -150,7 +134,6 @@ if __name__ == "__main__":
         status = check_host_status(host)
 
         if status:
-
             active_count += 1
 
             if active_count <= 30:
@@ -163,11 +146,11 @@ if __name__ == "__main__":
         f"Aktiv host sayı: {active_count}"
     )
 
-    msg = "\n".join(report_lines)
+    message = "\n".join(report_lines)
 
-    if len(msg) > 4000:
-        msg = msg[:3900] + "\n...(hesabat kəsildi)"
+    if len(message) > 4000:
+        message = message[:3900] + "\n...(hesabat kəsildi)"
 
-    send_telegram(msg)
+    send_telegram(message)
 
     print("[*] Hesabat Telegram-a göndərildi.")
