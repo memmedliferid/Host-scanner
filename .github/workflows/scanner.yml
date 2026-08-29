@@ -1,9 +1,10 @@
-name: scanner
+name: Host Monitor
 
 on:
   workflow_dispatch:
 
   schedule:
+    # Hər 2 gündən bir
     - cron: "17 2 */2 * *"
 
 permissions:
@@ -14,7 +15,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Repository
         uses: actions/checkout@v4
 
@@ -25,14 +25,15 @@ jobs:
 
       - name: Requests
         run: |
+          python -m pip install --upgrade pip
           pip install requests
 
-      - name: Scanner
+      - name: Host scanner
         env:
           TELEGRAM_TOKEN: "8811650010:AAF3qAKekoObZInM2NQavrc4YfnakHUBF7A"
           CHAT_ID: "1436101177"
         run: |
-          cat > /tmp/scanner.py <<'PYTHON'
+          cat > /tmp/scanner.py <<'PY'
           import requests
           import os
           from datetime import datetime, timezone
@@ -51,7 +52,7 @@ jobs:
               "User-Agent": "Mozilla/5.0"
           }
 
-          def telegram(message):
+          def telegram(text):
               url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
 
               try:
@@ -59,16 +60,19 @@ jobs:
                       url,
                       data={
                           "chat_id": CHAT_ID,
-                          "text": message
+                          "text": text
                       },
                       timeout=20
                   )
 
                   print("Telegram:", r.status_code)
-                  print(r.text[:300])
+
+                  if not r.ok:
+                      print(r.text)
 
               except Exception as e:
                   print("Telegram xətası:", e)
+
 
           def normalize(value, domain):
               value = value.strip().lower().rstrip(".")
@@ -81,11 +85,13 @@ jobs:
 
               return None
 
-          def crtsh(domain):
+
+          def get_crtsh(domain):
               result = set()
 
               try:
                   url = f"https://crt.sh/?q=%25.{domain}&output=json"
+
                   r = requests.get(
                       url,
                       headers=HEADERS,
@@ -93,10 +99,15 @@ jobs:
                   )
 
                   if r.status_code == 200:
+
                       for item in r.json():
-                          for name in item.get(
-                              "name_value", ""
-                          ).splitlines():
+
+                          names = item.get(
+                              "name_value",
+                              ""
+                          )
+
+                          for name in names.splitlines():
 
                               host = normalize(
                                   name,
@@ -111,7 +122,8 @@ jobs:
 
               return result
 
-          def hackertarget(domain):
+
+          def get_hackertarget(domain):
               result = set()
 
               try:
@@ -127,12 +139,16 @@ jobs:
                   )
 
                   if r.status_code == 200:
+
                       for line in r.text.splitlines():
 
                           if "," not in line:
                               continue
 
-                          host = line.split(",", 1)[0]
+                          host = line.split(
+                              ",",
+                              1
+                          )[0]
 
                           host = normalize(
                               host,
@@ -143,17 +159,21 @@ jobs:
                               result.add(host)
 
               except Exception as e:
-                  print("HackerTarget:", e)
+                  print(
+                      "HackerTarget:",
+                      e
+                  )
 
               return result
 
-          def alienvault(domain):
+
+          def get_alienvault(domain):
               result = set()
 
               try:
                   url = (
                       "https://otx.alienvault.com/"
-                      f"api/v1/indicators/domain/"
+                      "api/v1/indicators/domain/"
                       f"{domain}/passive_dns"
                   )
 
@@ -164,6 +184,7 @@ jobs:
                   )
 
                   if r.status_code == 200:
+
                       data = r.json()
 
                       for item in data.get(
@@ -172,7 +193,10 @@ jobs:
                       ):
 
                           host = normalize(
-                              item.get("hostname", ""),
+                              item.get(
+                                  "hostname",
+                                  ""
+                              ),
                               domain
                           )
 
@@ -180,11 +204,15 @@ jobs:
                               result.add(host)
 
               except Exception as e:
-                  print("AlienVault:", e)
+                  print(
+                      "AlienVault:",
+                      e
+                  )
 
               return result
 
-          def anubis(domain):
+
+          def get_anubis(domain):
               result = set()
 
               try:
@@ -204,6 +232,7 @@ jobs:
                       data = r.json()
 
                       if isinstance(data, list):
+
                           for name in data:
 
                               host = normalize(
@@ -219,23 +248,32 @@ jobs:
 
               return result
 
+
           def load_cache():
+
               if not os.path.exists(CACHE):
                   return set()
 
-              with open(
-                  CACHE,
-                  "r",
-                  encoding="utf-8"
-              ) as f:
+              try:
 
-                  return {
-                      x.strip().lower()
-                      for x in f
-                      if x.strip()
-                  }
+                  with open(
+                      CACHE,
+                      "r",
+                      encoding="utf-8"
+                  ) as f:
+
+                      return {
+                          line.strip().lower()
+                          for line in f
+                          if line.strip()
+                      }
+
+              except Exception:
+                  return set()
+
 
           def save_cache(hosts):
+
               with open(
                   CACHE,
                   "w",
@@ -245,20 +283,8 @@ jobs:
                   for host in sorted(hosts):
                       f.write(host + "\n")
 
-          def send_hosts(title, hosts):
 
-              if not hosts:
-                  return
-
-              lines = [
-                  title,
-                  "",
-                  f"Say: {len(hosts)}",
-                  ""
-              ]
-
-              for host in sorted(hosts):
-                  lines.append(f"• {host}")
+          def send_chunks(lines):
 
               message = "\n".join(lines)
 
@@ -269,6 +295,7 @@ jobs:
                       message = ""
 
                   else:
+
                       cut = message.rfind(
                           "\n",
                           0,
@@ -283,33 +310,35 @@ jobs:
 
                   telegram(part)
 
+
           def main():
 
-              print("PASSIV SUBDOMAIN SCANNER BAŞLADI")
+              print("=" * 50)
+              print("HOST MONITOR BAŞLADI")
+              print("=" * 50)
 
               current = set()
 
               for domain in DOMAINS:
 
                   print(
-                      "Yoxlanılır:",
-                      domain
+                      f"[+] {domain} yoxlanılır"
                   )
 
                   current.update(
-                      crtsh(domain)
+                      get_crtsh(domain)
                   )
 
                   current.update(
-                      hackertarget(domain)
+                      get_hackertarget(domain)
                   )
 
                   current.update(
-                      alienvault(domain)
+                      get_alienvault(domain)
                   )
 
                   current.update(
-                      anubis(domain)
+                      get_anubis(domain)
                   )
 
               old = load_cache()
@@ -332,48 +361,65 @@ jobs:
                   len(new)
               )
 
-              if not old:
+              # Telegram hesabatı
+              lines = [
+                  "🔎 HOST MONITOR",
+                  f"🕐 {now}",
+                  "",
+                  f"📊 Ümumi host/subdomain: {len(current)}",
+                  f"🆕 Yeni: {len(new)}",
+                  ""
+              ]
 
-                  send_hosts(
-                      "🔎 İLK SUBDOMAIN HESABATI\n"
-                      + now,
-                      current
+              if new:
+
+                  lines.append(
+                      "🆕 YENİ TAPILANLAR:"
                   )
 
-              elif new:
+                  for host in sorted(new):
+                      lines.append(
+                          f"• {host}"
+                      )
 
-                  send_hosts(
-                      "🆕 YENİ SUBDOMAINLƏR\n"
-                      + now,
-                      new
+                  lines.append("")
+
+              lines.append(
+                  "📋 BÜTÜN TAPILAN HOSTLAR:"
+              )
+
+              for host in sorted(current):
+                  lines.append(
+                      f"• {host}"
                   )
 
-              else:
-
-                  telegram(
-                      "✅ SCAN TAMAMLANDI\n"
-                      + now
-                      + "\n\n"
-                      + "Yeni subdomain tapılmadı."
-                  )
+              send_chunks(lines)
 
               save_cache(current)
 
+              print(
+                  "[+] Hesabat göndərildi"
+              )
+
+
           main()
-          PYTHON
+          PY
 
           python /tmp/scanner.py
 
       - name: Cache yadda saxla
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add hosts_cache.txt
+          if [ -f hosts_cache.txt ]; then
+            git add hosts_cache.txt
 
-          if git diff --cached --quiet; then
-            echo "Cache dəyişməyib."
-          else
-            git commit -m "Update subdomain cache"
-            git push
+            if git diff --cached --quiet; then
+              echo "Cache dəyişməyib."
+            else
+              git commit -m "Update host cache"
+              git push
+            fi
           fi
