@@ -11,9 +11,10 @@ DOMAINS = ["nar.az", "azercell.com"]
 
 def send_telegram(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "Markdown"}
+    payload = {"chat_id": CHAT_ID, "text": message}
     try:
-        requests.post(url, data=payload, timeout=10)
+        response = requests.post(url, data=payload, timeout=10)
+        print(f"Telegram cavabı: {response.text}")
     except Exception as e:
         print(f"Telegram xətası: {e}")
 
@@ -70,7 +71,7 @@ if __name__ == "__main__":
         current_hosts.update(get_crtsh_subdomains(dom))
         current_hosts.update(get_hackertarget_subdomains(dom))
     
-    report_lines = [f"📊 *Nar və Azercell Host Hesabatı*\nÜmumi tapılan: {len(current_hosts)}\n"]
+    report_lines = [f"Nar ve Azercell Host Hesabatı\nUmumi tapilan: {len(current_hosts)}\n"]
     
     active_count = 0
     for host in sorted(current_hosts):
@@ -78,7 +79,7 @@ if __name__ == "__main__":
         if status:
             active_count += 1
             if active_count <= 30:
-                report_lines.append(f"• `{host}` -> {status}")
+                report_lines.append(f"- {host} -> {status}")
 
     msg = "\n".join(report_lines)
     if len(msg) > 4000:
