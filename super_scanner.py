@@ -1,156 +1,302 @@
 import requests
-import socket
 import os
-import urllib3
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-# 
 TELEGRAM_TOKEN = "8811650010:AAFGCoQ5rMLmu4AjgjxxGeaNQ60WaTVpXeY"
 CHAT_ID = "1436101177"
 
-DOMAINS = ["nar.az", "azercell.com"]
+DOMAINS = [
+    "nar.az",
+    "azercell.com"
+]
+
 CACHE_FILE = "hosts_cache.txt"
 
+HEADERS = {
+    "User-Agent": "Mozilla/5.0"
+}
+
+
 def send_telegram(message):
-    if not TELEGRAM_TOKEN:
-        print("Xəta: Telegram token daxil edilməyib!")
+    if not TELEGRAM_TOKEN or TELEGRAM_TOKEN == "8811650010:AAFGCoQ5rMLmu4AjgjxxGeaNQ60WaTVpXeY":
+        print("Telegram token yazılmayıb!")
         return
+
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {"chat_id": CHAT_ID, "text": message}
+
     try:
-        response = requests.post(url, data=payload, timeout=10)
-        print(f"Telegram cavabı: {response.text}")
+        response = requests.post(
+            url,
+            data={
+                "chat_id": CHAT_ID,
+                "text": message
+            },
+            timeout=20
+        )
+
+        print("Telegram:", response.status_code)
+
     except Exception as e:
-        print(f"Telegram xətası: {e}")
+        print("Telegram xətası:", e)
 
-def get_crtsh(domain):
-    subdomains = set()
-    try:
-        url = f"https://crt.sh/?q=%25.{domain}&output=json"
-        res = requests.get(url, timeout=20)
-        if res.status_code == 200:
-            for entry in res.json():
-                name = entry.get('name_value', '')
-                for sub in name.split('\n'):
-                    sub = sub.strip().lower()
-                    if sub.endswith(domain) and '*' not in sub:
-                        subdomains.add(sub)
-    except Exception:
-        pass
-    return subdomains
 
-def get_hackertarget(domain):
-    subdomains = set()
-    try:
-        url = f"https://api.hackertarget.com/hostsearch/?q={domain}"
-        res = requests.get(url, timeout=15)
-        if res.status_code == 200 and "API count exceeded" not in res.text:
-            for line in res.text.split('\n'):
-                if ',' in line:
-                    sub = line.split(',')[0].strip().lower()
-                    if sub.endswith(domain):
-                        subdomains.add(sub)
-    except Exception:
-        pass
-    return subdomains
+def normalize_host(host, domain):
+    host = host.strip().lower().rstrip(".")
 
-def get_alienvault(domain):
-    subdomains = set()
-    try:
-        url = f"https://otx.alienvault.com/api/v1/indicators/domain/{domain}/passive_dns"
-        res = requests.get(url, timeout=15)
-        if res.status_code == 200:
-            for record in res.json().get('passive_dns', []):
-                hostname = record.get('hostname', '').strip().lower()
-                if hostname.endswith(domain) and '*' not in hostname:
-                    subdomains.add(hostname)
-    except Exception:
-        pass
-    return subdomains
+    if host.startswith("*."):
+        host = host[2:]
 
-def get_anubis(domain):
-    subdomains = set()
-    try:
-        url = f"https://jldc.me/anubis/subdomains/{domain}"
-        res = requests.get(url, timeout=15)
-        if res.status_code == 200:
-            for sub in res.json():
-                sub = sub.strip().lower()
-                if sub.endswith(domain) and '*' not in sub:
-                    subdomains.add(sub)
-    except Exception:
-        pass
-    return subdomains
+    if host == domain or host.endswith("." + domain):
+        return host
 
-def check_host_status(host):
-    try:
-        res = requests.get(f"https://{host}", timeout=3, verify=False)
-        if res.status_code == 200:
-            return "HTTP 200 (Aktiv)"
-        else:
-            return f"HTTP {res.status_code}"
-    except:
-        try:
-            socket.gethostbyname(host)
-            return "DNS Açıq"
-        except:
-            pass
     return None
 
+
+def get_crtsh(domain):
+    results = set()
+
+    try:
+        url = f"https://crt.sh/?q=%25.{domain}&output=json"
+
+        response = requests.get(
+            url,
+            headers=HEADERS,
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            for item in response.json():
+
+                names = item.get("name_value", "")
+
+                for name in names.splitlines():
+
+                    host = normalize_host(name, domain)
+
+                    if host:
+                        results.add(host)
+
+    except Exception as e:
+        print("crt.sh xətası:", e)
+
+    return results
+
+
+def get_hackertarget(domain):
+    results = set()
+
+    try:
+        url = f"https://api.hackertarget.com/hostsearch/?q={domain}"
+
+        response = requests.get(
+            url,
+            headers=HEADERS,
+            timeout=30
+        )
+
+        if response.status_code == 200:
+
+            for line in response.text.splitlines():
+
+                if "," not in line:
+                    continue
+
+                host = line.split(",", 1)[0]
+
+                host = normalize_host(host, domain)
+
+                if host:
+                    results.add(host)
+
+    except Exception as e:
+        print("HackerTarget xətası:", e)
+
+    return results
+
+
+def get_alienvault(domain):
+    results = set()
+
+    try:
+        url = (
+            "https://otx.alienvault.com/"
+            f"api/v1/indicators/domain/{domain}/passive_dns"
+        )
+
+        response = requests.get(
+            url,
+            headers=HEADERS,
+            timeout=30
+        )
+
+        if response.status_code == 200:
+
+            data = response.json()
+
+            for item in data.get("passive_dns", []):
+
+                host = item.get("hostname", "")
+
+                host = normalize_host(host, domain)
+
+                if host:
+                    results.add(host)
+
+    except Exception as e:
+        print("AlienVault xətası:", e)
+
+    return results
+
+
+def get_anubis(domain):
+    results = set()
+
+    try:
+        url = f"https://jldc.me/anubis/subdomains/{domain}"
+
+        response = requests.get(
+            url,
+            headers=HEADERS,
+            timeout=30
+        )
+
+        if response.status_code == 200:
+
+            for name in response.json():
+
+                host = normalize_host(name, domain)
+
+                if host:
+                    results.add(host)
+
+    except Exception as e:
+        print("Anubis xətası:", e)
+
+    return results
+
+
 def load_cache():
-    if os.path.exists(CACHE_FILE):
-        with open(CACHE_FILE, "r") as f:
-            return set(line.strip() for line in f if line.strip())
-    return set()
+
+    if not os.path.exists(CACHE_FILE):
+        return set()
+
+    try:
+
+        with open(
+            CACHE_FILE,
+            "r",
+            encoding="utf-8"
+        ) as file:
+
+            return {
+                line.strip().lower()
+                for line in file
+                if line.strip()
+            }
+
+    except Exception:
+        return set()
+
 
 def save_cache(hosts):
-    with open(CACHE_FILE, "w") as f:
-        for h in sorted(hosts):
-            f.write(h + "\n")
 
-if __name__ == "__main__":
-    print("[🔥] Host Scanner işə düşdü...")
+    with open(
+        CACHE_FILE,
+        "w",
+        encoding="utf-8"
+    ) as file:
+
+        for host in sorted(hosts):
+            file.write(host + "\n")
+
+
+def scan_domain(domain):
+
+    results = set()
+
+    print(f"\n[+] {domain} yoxlanılır...")
+
+    results.update(get_crtsh(domain))
+    results.update(get_hackertarget(domain))
+    results.update(get_alienvault(domain))
+    results.update(get_anubis(domain))
+
+    print(
+        f"[+] {domain}: "
+        f"{len(results)} subdomain tapıldı"
+    )
+
+    return results
+
+
+def main():
+
+    print("=" * 55)
+    print("       PASSİV SUBDOMAIN SCANNER")
+    print("=" * 55)
+
     current_hosts = set()
-    
-    for dom in DOMAINS:
-        current_hosts.update(get_crtsh(dom))
-        current_hosts.update(get_hackertarget(dom))
-        current_hosts.update(get_alienvault(dom))
-        current_hosts.update(get_anubis(dom))
+
+    for domain in DOMAINS:
+
+        hosts = scan_domain(domain)
+
+        current_hosts.update(hosts)
 
     old_hosts = load_cache()
-    is_first_run = len(old_hosts) == 0
-    new_hosts = current_hosts - old_hosts if not is_first_run else current_hosts
 
-    # Əgər yeni host tapılıbsa və ya ilk run-dursa hesabatı göndər
-    if new_hosts or is_first_run:
-        target_list = new_hosts if not is_first_run else current_hosts
-        host_results = {}
-        for host in sorted(target_list):
-            status = check_host_status(host)
-            if status:
-                host_results[host] = status
+    new_hosts = current_hosts - old_hosts
 
-        if host_results:
-            title = "Nar və Azercell Yeni Host Hesabatı" if not is_first_run else "Nar və Azercell İlk Host Hesabatı"
-            report_lines = [
-                title,
-                f"Ümumi tapılan: {len(current_hosts)}",
-                f"Aktiv host sayı: {len(host_results)}",
-                ""
-            ]
-            
-            for host, status in host_results.items():
-                report_lines.append(f"- {host} -> {status}")
+    print()
+    print(f"Ümumi subdomain: {len(current_hosts)}")
+    print(f"Əvvəlki nəticə: {len(old_hosts)}")
+    print(f"Yeni subdomain: {len(new_hosts)}")
 
-            msg = "\n".join(report_lines)
-            if len(msg) > 4000:
-                msg = msg[:3900] + "\n...(çoxluq səbəbilə kəsildi)"
-                
-            send_telegram(msg)
+    if new_hosts:
+
+        lines = [
+            "🆕 YENİ SUBDOMAINLƏR",
+            "",
+            f"Ümumi: {len(current_hosts)}",
+            f"Yeni: {len(new_hosts)}",
+            ""
+        ]
+
+        for host in sorted(new_hosts):
+
+            lines.append(
+                f"• {host}"
+            )
+
+        message = "\n".join(lines)
+
+        while len(message) > 3800:
+
+            cut = message.rfind(
+                "\n",
+                0,
+                3800
+            )
+
+            if cut <= 0:
+                cut = 3800
+
+            send_telegram(
+                message[:cut]
+            )
+
+            message = message[cut:].lstrip()
+
+        if message:
+            send_telegram(message)
+
     else:
-        print("Yeni host tapılmadı.")
+
+        print("Yeni subdomain tapılmadı.")
 
     save_cache(current_hosts)
-    
+
+    print("\n[+] İş tamamlandı.")
+
+
+if __name__ == "__main__":
+    main()
